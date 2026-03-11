@@ -61,7 +61,7 @@ void sendPackets(const char* ospf_data, int data_len, uint8_t type, uint32_t dst
     memcpy(packet + OSPFHDR_LEN, ospf_data, data_len);
 
     // calculte checksum
-    ospf_header->checksum = crc_checksum(ospf_header, packet_len);
+    ospf_header->checksum = htons(crc_checksum(ospf_header, packet_len));
 
     /* Send OSPF Packet */
     if (sendto(socket_fd, packet, packet_len, 0, (struct sockaddr*)&dst_sockaddr, sizeof(dst_sockaddr)) < 0) {
@@ -134,7 +134,7 @@ void* threadSendHelloPackets(void* intf) {
             *ospf_attach++ = htonl(nbr->id);
         }
         // calculte checksum
-        ospf_header->checksum = crc_checksum(ospf_header, packet_real_len);
+        ospf_header->checksum = htons(crc_checksum(ospf_header, packet_real_len));
 
         /* Send Packet */
         if (sendto(socket_fd, packet, packet_real_len, 0, (struct sockaddr*)&dst_sockaddr, sizeof(dst_sockaddr)) < 0) {
@@ -251,6 +251,10 @@ void* threadRecvPackets(void *intf) {
         
         /* check IP Header : filter  */
         ip_header = (struct iphdr*)packet_rcv;
+        uint16_t ip_packet_len = ntohs(ip_header->tot_len);
+        if (ip_packet_len < IPHDR_LEN + OSPFHDR_LEN) {
+            continue;
+        }
         // 1. not OSPF packet
         if (ip_header->protocol != 89) {
             continue;
@@ -272,17 +276,40 @@ void* threadRecvPackets(void *intf) {
         #endif
 
         OSPFHeader* ospf_header = (OSPFHeader*)(packet_rcv + IPHDR_LEN);
+        uint16_t ospf_packet_len = ntohs(ospf_header->packet_length);
+        if (ospf_header->version != 2 || ospf_packet_len < OSPFHDR_LEN || ospf_packet_len > ip_packet_len - IPHDR_LEN) {
+            continue;
+        }
+        if (ntohl(ospf_header->area_id) != interface->area_id) {
+            continue;
+        }
+        if (ntohs(ospf_header->autype) != 0) {
+            continue;
+        }
+        uint16_t recv_cksum = ntohs(ospf_header->checksum);
+        ospf_header->checksum = 0;
+        uint16_t calc_cksum = crc_checksum(ospf_header, ospf_packet_len);
+        ospf_header->checksum = htons(recv_cksum);
+        if (calc_cksum != recv_cksum) {
+            continue;
+        }
         /* translate : net to host */
         ospf_header->packet_length = ntohs(ospf_header->packet_length);
         ospf_header->router_id     = ntohl(ospf_header->router_id    );
         ospf_header->area_id       = ntohl(ospf_header->area_id      );
-        ospf_header->checksum      = ntohl(ospf_header->checksum     );
+        ospf_header->checksum      = ntohs(ospf_header->checksum     );
 
         if (ospf_header->type == T_HELLO) {
         #ifdef DEBUG
             printf("[Thread]RecvPacket: Hello packet\n");
         #endif
             OSPFHello* ospf_hello = (OSPFHello*)(packet_rcv + IPHDR_LEN + OSPFHDR_LEN);
+            if (ntohl(ospf_hello->network_mask) != interface->mask ||
+                ntohs(ospf_hello->hello_interval) != interface->hello_intervel ||
+                ntohl(ospf_hello->router_dead_interval) != interface->router_dead_interval ||
+                ospf_hello->options != 0x02) {
+                continue;
+            }
             Neighbor* neighbor;
 
             if ((neighbor = interface->getNeighbor(src_ip)) == nullptr) {
@@ -293,7 +320,7 @@ void* threadRecvPackets(void *intf) {
             uint32_t prev_nbdr  = neighbor->nbdr;
             neighbor->ndr  = ntohl(ospf_hello->designated_router);
             neighbor->nbdr = ntohl(ospf_hello->backup_designated_router);
-            neighbor->priority = ntohl(ospf_hello->rtr_pri);
+            neighbor->priority = ospf_hello->rtr_pri;
 
             neighbor->eventHelloReceived();
 
@@ -379,7 +406,7 @@ void* threadRecvPackets(void *intf) {
                         seq_num += 1;
                     } else
                     if (!ospf_dd->b_I && !ospf_dd->b_MS
-                        && ospf_dd->sequence_number == seq_num
+                        && seq_num == neighbor->dd_seq_num
                         && neighbor->id < myconfigs::router_id) {
                         // receive dd: x 0 0 smaller_id
                         /* confirm neighbor is slave */

@@ -2,6 +2,7 @@
 #define OSPF_PACKET_H
 
 #include <stdint.h>
+#include <cstddef>
 #include <vector>
 
 #define IPPROTO_OSPF    (89)
@@ -131,6 +132,7 @@ struct LSA {
     LSAHeader lsa_header;
 
     LSA();
+    virtual ~LSA() = default;
     virtual char* toLSAPacket() = 0;
     virtual size_t size() = 0;
     bool operator>(const LSA& other);
@@ -171,4 +173,3 @@ struct LSANetwork : public LSA {
 };
 
 #endif // OSPF_PACKET_H
-
