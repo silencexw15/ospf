@@ -45,6 +45,12 @@ retransmitter.cpp/.h	# 重传工具
 
 <img src="https://i.postimg.cc/nhkZ8M5d/ensp.png" style="width:60%;" />
 
+### Windows 适配说明
+
+本项目原始实现基于 Linux 内核接口（raw socket + ioctl 路由），如果要在 Windows（含 VMware 内 Win7）编译/运行，请参考：
+
+- `doc/windows_porting_guide.md`
+
 ### 参考资料
 - RFC 2328：有种规范的美感
 - 《OSPF完全实现》及其源码：比较复杂完整，没有太多精力借鉴。[源码分享](https://pan.baidu.com/s/1tMO2Cf92Iy1mc2eP56qvlQ)，提取码：dz89 
