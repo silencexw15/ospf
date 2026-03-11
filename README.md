@@ -45,6 +45,25 @@ retransmitter.cpp/.h	# 重传工具
 
 <img src="https://i.postimg.cc/nhkZ8M5d/ensp.png" style="width:60%;" />
 
+
+### 在VMware + eNSP + Ubuntu环境下的建议配置
+
+1. **VMware网络建议使用同一网段**：Win7(eNSP) 与 Ubuntu(运行本项目) 都挂到 `VMnet8(NAT)`，并确认网段一致（例如你当前的 `192.168.234.131/24` 与 `192.168.234.133/24`）。
+2. **在eNSP中接入VMnet8**：通过 Cloud/桥接方式把路由器 GE 口接入 `VMware Network Adapter VMnet8`，并给路由器接口配置同网段地址。
+3. **关闭或放通Win7防火墙**：OSPF协议号是 IP Proto 89，不走TCP/UDP端口，建议先临时关闭防火墙排查。
+4. **Ubuntu启用转发（按需）**：若Ubuntu需要承担转发角色，执行 `sudo sysctl -w net.ipv4.ip_forward=1`。
+
+本项目默认写死了网卡名/IP（原为 `ens33` + `192.168.75.128`），现在支持通过环境变量覆盖：
+
+```bash
+export OSPF_NIC=ens33
+export OSPF_INTERFACE_IP=192.168.234.133
+export OSPF_ROUTER_ID=192.168.234.133   # 可选，不设置时默认等于接口IP
+sudo -E ./my_ospf
+```
+
+如果Ubuntu网卡名不是 `ens33`（常见如 `ens160`），必须同步修改 `OSPF_NIC`。
+
 ### 参考资料
 - RFC 2328：有种规范的美感
 - 《OSPF完全实现》及其源码：比较复杂完整，没有太多精力借鉴。[源码分享](https://pan.baidu.com/s/1tMO2Cf92Iy1mc2eP56qvlQ)，提取码：dz89 

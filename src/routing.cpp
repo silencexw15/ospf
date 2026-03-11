@@ -7,6 +7,7 @@
 #include <sys/ioctl.h>  // ioctl()
 #include <unistd.h>     // close()
 #include <string.h>     // memset()
+#include <cstdio>
 
 #define INF (0x7fffffff)
 

@@ -11,10 +11,13 @@
 
 namespace myconfigs {
     extern const char* nic_name;
+    extern uint32_t interface_ip;
     extern uint32_t router_id;
     extern std::vector<Interface*> interfaces;
     extern std::map<uint32_t, Interface*> ip2interface;
     extern pthread_attr_t thread_attr;
+
+    void initRuntimeConfig();
 } // namespace Configs
 
 extern struct in_addr ipaddr_tmp;

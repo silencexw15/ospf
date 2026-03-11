@@ -220,7 +220,7 @@ void* threadSendLSRPackets(void* nbr) {
 void* threadRecvPackets(void *intf) {
     Interface *interface = (Interface*) intf;
     int socket_fd;
-    if ((socket_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_IP))) < 0) {
+    if ((socket_fd = socket(AF_INET, SOCK_RAW, IPPROTO_OSPF)) < 0) {
         perror("[Thread]RecvPacket: socket_fd init");
     }
 
@@ -240,7 +240,7 @@ void* threadRecvPackets(void *intf) {
     struct in_addr src, dst;
 #define RECV_LEN 1514
     char* frame_rcv = (char*)malloc(RECV_LEN);
-    char* packet_rcv = frame_rcv + sizeof(struct ethhdr);
+    char* packet_rcv = frame_rcv;
     while (true) {
         if (to_exit) {
             break;
@@ -276,7 +276,7 @@ void* threadRecvPackets(void *intf) {
         ospf_header->packet_length = ntohs(ospf_header->packet_length);
         ospf_header->router_id     = ntohl(ospf_header->router_id    );
         ospf_header->area_id       = ntohl(ospf_header->area_id      );
-        ospf_header->checksum      = ntohl(ospf_header->checksum     );
+        ospf_header->checksum      = ntohs(ospf_header->checksum     );
 
         if (ospf_header->type == T_HELLO) {
         #ifdef DEBUG

@@ -2,6 +2,7 @@
 #define OSPF_PACKET_H
 
 #include <stdint.h>
+#include <cstddef>
 #include <vector>
 
 #define IPPROTO_OSPF    (89)

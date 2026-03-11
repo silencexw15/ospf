@@ -20,6 +20,7 @@ void* waitTimer(void* intf) {
     Interface* interface = (Interface*)intf;
     sleep(40);  // time not sure
     interface->eventWaitTimer();
+    return nullptr;
 }
 
 
