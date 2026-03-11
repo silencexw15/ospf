@@ -5,6 +5,7 @@
 #include "setting.h"
 
 #include <vector>
+#include <cstdio>
 
 
 // TODO: should leave lsdb.xxx_lock in the LSDB class itself!
