@@ -40,6 +40,17 @@ namespace myconfigs {
         } else {
             router_id = interface_ip;
         }
+
+        struct in_addr nic_ip_addr;
+        struct in_addr rid_addr;
+        char ipbuf[INET_ADDRSTRLEN] = {0};
+        char ridbuf[INET_ADDRSTRLEN] = {0};
+        nic_ip_addr.s_addr = htonl(interface_ip);
+        rid_addr.s_addr = htonl(router_id);
+        inet_ntop(AF_INET, &nic_ip_addr, ipbuf, sizeof(ipbuf));
+        inet_ntop(AF_INET, &rid_addr, ridbuf, sizeof(ridbuf));
+        printf("[config] nic=%s interface_ip=%s router_id=%s\n",
+            nic_name, ipbuf, ridbuf);
     }
 } // namespace Configs
 
