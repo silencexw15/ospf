@@ -276,7 +276,7 @@ void* threadRecvPackets(void *intf) {
         ospf_header->packet_length = ntohs(ospf_header->packet_length);
         ospf_header->router_id     = ntohl(ospf_header->router_id    );
         ospf_header->area_id       = ntohl(ospf_header->area_id      );
-        ospf_header->checksum      = ntohl(ospf_header->checksum     );
+        ospf_header->checksum      = ntohs(ospf_header->checksum     );
 
         if (ospf_header->type == T_HELLO) {
         #ifdef DEBUG

@@ -18,9 +18,11 @@ int main(int argc, char** argv) {
     pthread_t hello_sender_thread;
     pthread_t receiver_thread;
 
+    myconfigs::initRuntimeConfig();
+
     /* init interface */
     Interface interface1;
-    interface1.ip = ntohl(inet_addr("192.168.75.128")); // TODO: read nic for addr
+    interface1.ip = myconfigs::interface_ip;
     myconfigs::interfaces.push_back(&interface1);
     myconfigs::ip2interface[interface1.ip] = &interface1;
     interface1.eventInterfaceUp();
