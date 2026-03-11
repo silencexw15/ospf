@@ -67,7 +67,7 @@ void OSPFLSR::net2host() {
 LSAHeader::LSAHeader() {
     ls_age = 100;
     options = 0x2;
-    ls_sequence_number = 0x80000000; // init
+    ls_sequence_number = 0x80000001; // RFC2328 initial sequence number
 }
 
 void LSAHeader::host2net() {
@@ -135,11 +135,27 @@ bool LSA::operator>(const LSA& other) {
     // assert link_state_id and advertising_router is equal
     assert(lsa_header.link_state_id == other.lsa_header.link_state_id);
     assert(lsa_header.advertising_router == other.lsa_header.advertising_router);
-    if (this->lsa_header.ls_sequence_number > other.lsa_header.ls_sequence_number) {
-        return true;
-    } else if (this->lsa_header.ls_sequence_number == other.lsa_header.ls_sequence_number) {
-        // TODO: compare checksum and more
+
+    if (lsa_header.ls_sequence_number != other.lsa_header.ls_sequence_number) {
+        return lsa_header.ls_sequence_number > other.lsa_header.ls_sequence_number;
     }
+
+    if (lsa_header.ls_checksum != other.lsa_header.ls_checksum) {
+        return lsa_header.ls_checksum > other.lsa_header.ls_checksum;
+    }
+
+    const uint16_t MAX_AGE = 3600;
+    const uint16_t MAX_AGE_DIFF = 900;
+    if (lsa_header.ls_age == MAX_AGE && other.lsa_header.ls_age != MAX_AGE) {
+        return true;
+    }
+    if (lsa_header.ls_age != MAX_AGE && other.lsa_header.ls_age == MAX_AGE) {
+        return false;
+    }
+    if (lsa_header.ls_age + MAX_AGE_DIFF < other.lsa_header.ls_age) {
+        return true;
+    }
+
     return false;
 }
 

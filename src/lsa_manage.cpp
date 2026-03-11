@@ -5,6 +5,7 @@
 #include "setting.h"
 
 #include <vector>
+#include <cstdio>
 
 
 // TODO: should leave lsdb.xxx_lock in the LSDB class itself!
@@ -25,7 +26,7 @@ void onGeneratingRouterLSA() {
         pthread_mutex_lock(&lsdb.router_lock);
         lsdb.router_lsas.push_back(router_lsa);
         pthread_mutex_unlock(&lsdb.router_lock);
-        // is_added = true;
+        is_added = true;
     } else if (*router_lsa > *lsa_find) {
         #ifdef DEBUG
             printf("it is a newer router lsa, insert to lsdb, remove old one\n");
@@ -35,6 +36,8 @@ void onGeneratingRouterLSA() {
         lsdb.router_lsas.push_back(router_lsa);
         pthread_mutex_unlock(&lsdb.router_lock);
         is_added = true;
+    } else {
+        delete router_lsa;
     }
     // consider -- so why not use <set>
     if (is_added) {
@@ -51,16 +54,43 @@ void onGeneratingNetworkLSA(Interface* interface) {
     #endif
     LSANetwork* network_lsa = genNetworkLSA(interface);
 
-    LSANetwork* lsa_find = lsdb.getNetworkLSA(myconfigs::router_id, interface->ip);
+    LSANetwork* lsa_find = lsdb.getNetworkLSA(interface->ip, myconfigs::router_id);
     bool is_added = false;
+    if (interface->dr != interface->ip ||
+        (interface->type != NetworkType::T_BROADCAST && interface->type != NetworkType::T_NBMA)) {
+        if (lsa_find != nullptr) {
+            lsdb.delLSA(lsa_find->lsa_header.link_state_id, lsa_find->lsa_header.advertising_router, LSA_NETWORK);
+        }
+        delete network_lsa;
+        return;
+    }
+
+    bool has_full_neighbor = false;
+    for (auto& p_neighbor: interface->neighbor_list) {
+        if (p_neighbor->state == NeighborState::S_FULL) {
+            has_full_neighbor = true;
+            break;
+        }
+    }
+    if (!has_full_neighbor) {
+        if (lsa_find != nullptr) {
+            lsdb.delLSA(lsa_find->lsa_header.link_state_id, lsa_find->lsa_header.advertising_router, LSA_NETWORK);
+        }
+        delete network_lsa;
+        return;
+    }
     if (lsa_find == nullptr || !(*lsa_find == *network_lsa)) {
         /* lsdb do not contain this lsa: add the lsa */
         #ifdef DEBUG
             printf("it is a new network lsa, insert to lsdb\n");
         #endif
+        if (lsa_find != nullptr) {
+            lsdb.delLSA(lsa_find->lsa_header.link_state_id, lsa_find->lsa_header.advertising_router, LSA_NETWORK);
+        }
         pthread_mutex_lock(&lsdb.network_lock);
         lsdb.network_lsas.push_back(network_lsa);
         pthread_mutex_unlock(&lsdb.network_lock);
+        is_added = true;
     } else if (*network_lsa > *lsa_find) {
         #ifdef DEBUG
             printf("it is a newer network lsa, insert to lsdb, remove old one\n");
@@ -70,6 +100,8 @@ void onGeneratingNetworkLSA(Interface* interface) {
         lsdb.network_lsas.push_back(network_lsa);
         pthread_mutex_unlock(&lsdb.network_lock);
         is_added = true;
+    } else {
+        delete network_lsa;
     }
 
     if (is_added) {
@@ -128,9 +160,10 @@ LSANetwork* genNetworkLSA(Interface *interface) {
         lsa_seq_cnt += 1;
     pthread_mutex_unlock(&lsa_seq_lock);
 
+    network_lsa->attached_routers.push_back(myconfigs::router_id);
     for (auto& p_neighbor: interface->neighbor_list) {
         if (p_neighbor->state == NeighborState::S_FULL) {
-            network_lsa->attached_routers.push_back(p_neighbor->ip);
+            network_lsa->attached_routers.push_back(p_neighbor->id);
         }
     }
 
