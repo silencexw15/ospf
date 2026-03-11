@@ -4,6 +4,7 @@
 #include "packet_manage.h"
 #include "lsa_manage.h"
 #include "routing.h"
+#include <ctime>
 
 Neighbor::Neighbor(in_addr_t ip, Interface* intf):ip(ip) {
     state = NeighborState::S_DOWN;
@@ -30,7 +31,7 @@ void Neighbor::initDBSummaryList() {
     for (auto& p_lsa: lsdb.router_lsas) {
         char* full_rlsa_packet = p_lsa->toRouterLSA();
         db_summary_list.push_back(*((LSAHeader*)full_rlsa_packet));
-        delete full_rlsa_packet;
+        delete[] full_rlsa_packet;
     }
     pthread_mutex_unlock(&lsdb.router_lock);
 
@@ -38,7 +39,7 @@ void Neighbor::initDBSummaryList() {
     for (auto& p_lsa: lsdb.network_lsas) {
         char* full_nlsa_packet = p_lsa->toNetworkLSA();
         db_summary_list.push_back(*((LSAHeader*)full_nlsa_packet));
-        delete full_nlsa_packet;
+        delete[] full_nlsa_packet;
     }
     pthread_mutex_unlock(&lsdb.network_lock);
 }
@@ -81,9 +82,9 @@ void Neighbor::event2WayReceived() {
         switch (intf_type) {
             case NetworkType::T_BROADCAST: 
             case NetworkType::T_NBMA: {
-                if (this->id != this->ndr && this->id != this->nbdr &&
-                    myconfigs::router_id != this->ndr && 
-                    myconfigs::router_id != this->nbdr) {
+                if (this->ip != this->ndr && this->ip != this->nbdr &&
+                    h_intf->ip != this->ndr && 
+                    h_intf->ip != this->nbdr) {
                     /* do not forms adjacency */
                     state = NeighborState::S_2WAY;
                     printf("and its state from INIT -> 2-WAY.\n");
@@ -97,7 +98,8 @@ void Neighbor::event2WayReceived() {
                 state = NeighborState::S_EXSTART;
                 printf("and its state from INIT -> EXSTART.\n");
                 /* start to send DD empty packet: prepare master/slave */
-                dd_seq_num = 0;
+                dd_seq_num = static_cast<uint32_t>(time(NULL)) ^ myconfigs::router_id ^ this->id;
+                if (dd_seq_num == 0) dd_seq_num = 1;
                 is_master = true;
                 pthread_create(&empty_dd_send_thread, &myconfigs::thread_attr, threadSendEmptyDDPackets, (void*)this);
                 break;

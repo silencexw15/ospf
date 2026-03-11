@@ -73,7 +73,12 @@ void LSDB::addLSA(char* net_ptr) {
 
         LSARouter* lsa_check = getRouterLSA(rlsa->lsa_header.link_state_id, rlsa->lsa_header.advertising_router);
         pthread_mutex_lock(&router_lock);
-        if (lsa_check != nullptr) { // arbitrary : delete the old in the router_lsa;
+        if (lsa_check != nullptr) {
+            if (!(*rlsa > *lsa_check)) {
+                delete rlsa;
+                pthread_mutex_unlock(&router_lock);
+                return;
+            }
             for (auto it = router_lsas.begin(); it != router_lsas.end(); ++it) {
                 if (*it == lsa_check) {
                     router_lsas.erase(it);
@@ -89,6 +94,11 @@ void LSDB::addLSA(char* net_ptr) {
         LSANetwork* lsa_check = getNetworkLSA(nlsa->lsa_header.link_state_id, nlsa->lsa_header.advertising_router);
         pthread_mutex_lock(&network_lock);
         if (lsa_check != nullptr) {
+            if (!(*nlsa > *lsa_check)) {
+                delete nlsa;
+                pthread_mutex_unlock(&network_lock);
+                return;
+            }
             for (auto it = network_lsas.begin(); it != network_lsas.end(); ++it) {
                 if (*it == lsa_check) {
                     network_lsas.erase(it);
