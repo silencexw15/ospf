@@ -232,6 +232,16 @@ void* threadRecvPackets(void *intf) {
         perror("[Thread]RecvPacket: setsockopt - bind to device");
     }
 
+    /* Join AllSPFRouters multicast group (224.0.0.5) so hello packets can be delivered to raw socket. */
+    struct ip_mreqn mreq;
+    memset(&mreq, 0, sizeof(mreq));
+    mreq.imr_multiaddr.s_addr = inet_addr("224.0.0.5");
+    mreq.imr_address.s_addr = htonl(interface->ip);
+    mreq.imr_ifindex = if_nametoindex(myconfigs::nic_name);
+    if (setsockopt(socket_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+        perror("[Thread]RecvPacket: setsockopt - IP_ADD_MEMBERSHIP 224.0.0.5");
+    }
+
 #ifdef DEBUG
     printf("[Thread]RecvPacket init\n");
 #endif
