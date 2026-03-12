@@ -261,6 +261,10 @@ void* threadRecvPackets(void *intf) {
         
         /* check IP Header : filter  */
         ip_header = (struct iphdr*)packet_rcv;
+        uint32_t ip_header_len = ip_header->ihl * 4;
+        if (recv_size < (int)(ip_header_len + OSPFHDR_LEN)) {
+            continue;
+        }
         // 1. not OSPF packet
         if (ip_header->protocol != 89) {
             continue;
@@ -281,9 +285,12 @@ void* threadRecvPackets(void *intf) {
             printf(" dst:%s\n", inet_ntoa(dst));
         #endif
 
-        OSPFHeader* ospf_header = (OSPFHeader*)(packet_rcv + IPHDR_LEN);
+        OSPFHeader* ospf_header = (OSPFHeader*)(packet_rcv + ip_header_len);
         /* translate : net to host */
         ospf_header->packet_length = ntohs(ospf_header->packet_length);
+        if (ospf_header->packet_length < OSPFHDR_LEN || recv_size < (int)(ip_header_len + ospf_header->packet_length)) {
+            continue;
+        }
         ospf_header->router_id     = ntohl(ospf_header->router_id    );
         ospf_header->area_id       = ntohl(ospf_header->area_id      );
         ospf_header->checksum      = ntohs(ospf_header->checksum     );
@@ -292,7 +299,7 @@ void* threadRecvPackets(void *intf) {
         #ifdef DEBUG
             printf("[Thread]RecvPacket: Hello packet\n");
         #endif
-            OSPFHello* ospf_hello = (OSPFHello*)(packet_rcv + IPHDR_LEN + OSPFHDR_LEN);
+            OSPFHello* ospf_hello = (OSPFHello*)(packet_rcv + ip_header_len + OSPFHDR_LEN);
             Neighbor* neighbor;
 
             if ((neighbor = interface->getNeighbor(src_ip)) == nullptr) {
@@ -303,14 +310,14 @@ void* threadRecvPackets(void *intf) {
             uint32_t prev_nbdr  = neighbor->nbdr;
             neighbor->ndr  = ntohl(ospf_hello->designated_router);
             neighbor->nbdr = ntohl(ospf_hello->backup_designated_router);
-            neighbor->priority = ntohl(ospf_hello->rtr_pri);
+            neighbor->priority = ospf_hello->rtr_pri;
 
             neighbor->eventHelloReceived();
 
             bool to_2way = false;
             /* Decide 1way or 2way: check whether Hello attached-info has self-routerid */ 
-            uint32_t* ospf_attach = (uint32_t*)(packet_rcv + IPHDR_LEN + OSPF_HELLO_LEN);
-            uint32_t* ospf_end = (uint32_t*)(packet_rcv + IPHDR_LEN + ospf_header->packet_length);
+            uint32_t* ospf_attach = (uint32_t*)(packet_rcv + ip_header_len + OSPF_HELLO_LEN);
+            uint32_t* ospf_end = (uint32_t*)(packet_rcv + ip_header_len + ospf_header->packet_length);
             for (;ospf_attach != ospf_end; ++ospf_attach) {
                 if (*ospf_attach == htonl(myconfigs::router_id)) {
                     to_2way = true;
@@ -351,7 +358,7 @@ void* threadRecvPackets(void *intf) {
         #ifdef DEBUG
             printf("[Thread]RecvPacket: DD packet\n");
         #endif
-            OSPFDD* ospf_dd = (OSPFDD*)(packet_rcv + IPHDR_LEN + OSPFHDR_LEN);
+            OSPFDD* ospf_dd = (OSPFDD*)(packet_rcv + ip_header_len + OSPFHDR_LEN);
             Neighbor* neighbor = interface->getNeighbor(src_ip);
             
             bool is_accepted = false;
@@ -468,8 +475,8 @@ void* threadRecvPackets(void *intf) {
 
             if (is_accepted) {
                 /* 1. Receive DD packet and update link_state_req_list */
-                LSAHeader* lsa_header_rcv = (LSAHeader*)(packet_rcv + IPHDR_LEN + OSPF_DD_LEN);
-                LSAHeader* lsa_header_end = (LSAHeader*)(packet_rcv + IPHDR_LEN + ospf_header->packet_length);
+                LSAHeader* lsa_header_rcv = (LSAHeader*)(packet_rcv + ip_header_len + OSPF_DD_LEN);
+                LSAHeader* lsa_header_end = (LSAHeader*)(packet_rcv + ip_header_len + ospf_header->packet_length);
                 while (lsa_header_rcv != lsa_header_end) {
                     LSAHeader lsa_header;
                     lsa_header.advertising_router = ntohl(lsa_header_rcv->advertising_router);
@@ -589,8 +596,8 @@ void* threadRecvPackets(void *intf) {
         #ifdef DEBUG
             printf("[Thread]RecvPacket: LSR packet\n");
         #endif
-            OSPFLSR* lsr_rcv = (OSPFLSR*)(packet_rcv + IPHDR_LEN + OSPFHDR_LEN);
-            OSPFLSR* lsr_end = (OSPFLSR*)(packet_rcv + IPHDR_LEN + ospf_header->packet_length);
+            OSPFLSR* lsr_rcv = (OSPFLSR*)(packet_rcv + ip_header_len + OSPFHDR_LEN);
+            OSPFLSR* lsr_end = (OSPFLSR*)(packet_rcv + ip_header_len + ospf_header->packet_length);
             Neighbor* neighbor = interface->getNeighbor(src_ip);
 
             // check neighbor state
@@ -658,7 +665,7 @@ void* threadRecvPackets(void *intf) {
                 neighbor = interface->getNeighbor(src_ip);
             }
 
-            OSPFLSU* ospf_lsu = (OSPFLSU*)(packet_rcv + IPHDR_LEN + OSPFHDR_LEN);
+            OSPFLSU* ospf_lsu = (OSPFLSU*)(packet_rcv + ip_header_len + OSPFHDR_LEN);
             int lsa_num = ntohl(ospf_lsu->num);
 
             char* lsack_data = (char*)malloc(1024); 
