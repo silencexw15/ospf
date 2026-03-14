@@ -64,6 +64,30 @@ sudo -E ./my_ospf
 
 如果Ubuntu网卡名不是 `ens33`（常见如 `ens160`），必须同步修改 `OSPF_NIC`。
 
+### 常见问题：`dis ospf peer` 显示邻居卡在 `Init`
+
+如果在 eNSP 路由器上能看到 Ubuntu 的 Router ID，但状态一直是 `Init`，通常表示 **单向 Hello**：
+
+- eNSP 收到了 Ubuntu 发来的 Hello；
+- 但 Ubuntu 的 Hello 邻居列表中没有（或还没有）包含 eNSP 的 Router ID；
+- 因而 eNSP 无法进入 `2-Way/Full`。
+
+结合本项目实现，Hello 报文的邻居列表来自 `interface->neighbor_list`。只有当 Ubuntu 先收到对端 Hello 后，才会把对端 Router ID 回填到后续 Hello 中。
+
+排查建议：
+
+1. 先确认双向收包（尤其是 Ubuntu 是否能收到 eNSP 发往 `224.0.0.5` 的 OSPF 报文）；
+2. 重点检查 Win7 防火墙、eNSP Cloud 绑定网卡是否正确、VMnet8 是否允许该方向组播/协议 89；
+3. 确认双方 OSPF 参数一致：Area、Hello/Dead、掩码、认证。
+
+可在 Ubuntu 执行：
+
+```bash
+sudo tcpdump -ni ens33 'ip proto 89 or host 224.0.0.5'
+```
+
+若只看到 Ubuntu 发包而看不到 eNSP 回包，问题基本不在本程序状态机，而在虚拟网络互通链路（Cloud/防火墙/网卡绑定）。
+
 ### 参考资料
 - RFC 2328：有种规范的美感
 - 《OSPF完全实现》及其源码：比较复杂完整，没有太多精力借鉴。[源码分享](https://pan.baidu.com/s/1tMO2Cf92Iy1mc2eP56qvlQ)，提取码：dz89 
