@@ -224,6 +224,13 @@ void* threadRecvPackets(void *intf) {
         perror("[Thread]RecvPacket: socket_fd init");
     }
 
+    struct ip_mreq mreq;
+    mreq.imr_multiaddr.s_addr = inet_addr("224.0.0.5");
+    mreq.imr_interface.s_addr = htonl(interface->ip);  // 绑定到你的接口IP上
+    if (setsockopt(socket_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+        perror("[Thread]RecvPacket: setsockopt IP_ADD_MEMBERSHIP 224.0.0.5");
+    }
+
     /* Bind sockets to certain Network Interface : seems useless */
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
